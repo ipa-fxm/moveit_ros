@@ -67,9 +67,17 @@ bool ReachableAndValidPoseFilter::isStateCollisionFree(const ManipulationPlan *m
   req.group_name = manipulation_plan->shared_data_->planning_group_;
   planning_scene_->checkCollision(req, res, *joint_state_group->getRobotState(), *collision_matrix_);
   if (res.collision == false)
-    return planning_scene_->isStateFeasible(*joint_state_group->getRobotState());
+  {
+    bool is_feasible = planning_scene_->isStateFeasible(*joint_state_group->getRobotState());
+    if(!is_feasible)
+        ROS_WARN("ReachableAndValidPoseFilter: state is infeasible!");
+    return is_feasible;
+  }
   else
+  {
+    ROS_WARN("ReachableAndValidPoseFilter: state is in collision!");
     return false;
+  } 
 }
 
 bool ReachableAndValidPoseFilter::isEndEffectorFree(const ManipulationPlanPtr &plan, robot_state::RobotState &token_state) const
@@ -79,9 +87,11 @@ bool ReachableAndValidPoseFilter::isEndEffectorFree(const ManipulationPlanPtr &p
   token_state.updateStateWithLinkAt(plan->shared_data_->ik_link_name_, plan->transformed_goal_pose_);
   collision_detection::CollisionRequest req;
   req.verbose = verbose_;
+  req.max_contacts = 1;
   collision_detection::CollisionResult res;
   req.group_name = plan->shared_data_->end_effector_group_;
   planning_scene_->checkCollision(req, res, token_state, *collision_matrix_);
+
   return res.collision == false;
 }
 
@@ -91,6 +101,7 @@ bool ReachableAndValidPoseFilter::evaluate(const ManipulationPlanPtr &plan) cons
   robot_state::RobotStatePtr token_state(new robot_state::RobotState(planning_scene_->getCurrentState()));
   if (isEndEffectorFree(plan, *token_state))
   {
+    ROS_WARN("ReachableAndValidPoseFilter: Endeffector is free!");
     // update the goal pose message if anything has changed; this is because the name of the frame in the input goal pose
     // can be that of objects in the collision world but most components are unaware of those transforms,
     // so we convert to a frame that is certainly known
@@ -118,12 +129,12 @@ bool ReachableAndValidPoseFilter::evaluate(const ManipulationPlanPtr &plan) cons
         return true;
       }
       else
-        if (verbose_)
-          ROS_INFO("Sampler failed to produce a state");
+        ROS_WARN("ReachableAndValidPoseFilter: Sampler failed to produce a state");
     }
     else
       ROS_ERROR_THROTTLE(1, "No sampler was constructed");
   }
+  ROS_WARN("ReachableAndValidPoseFilter: Goal in collision!"); 
   plan->error_code_.val = moveit_msgs::MoveItErrorCodes::GOAL_IN_COLLISION;
   return false;
 }

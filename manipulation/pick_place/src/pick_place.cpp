@@ -53,7 +53,8 @@ const double PickPlace::DEFAULT_GRASP_POSTURE_COMPLETION_DURATION = 7.0; // seco
 
 PickPlacePlanBase::PickPlacePlanBase(const PickPlaceConstPtr &pick_place, const std::string &name) :
   pick_place_(pick_place),
-  pipeline_(name, 4),
+  //pipeline_(name, 4),
+  pipeline_(name, 1),
   last_plan_time_(0.0),
   done_(false)
 {

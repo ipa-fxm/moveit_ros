@@ -115,9 +115,17 @@ bool isStateCollisionFree(const planning_scene::PlanningScene *planning_scene,
   req.group_name = joint_state_group->getName();
   planning_scene->checkCollision(req, res, *joint_state_group->getRobotState(), *collision_matrix);
   if (res.collision == false)
-    return planning_scene->isStateFeasible(*joint_state_group->getRobotState());
+  {
+    bool is_feasible = planning_scene->isStateFeasible(*joint_state_group->getRobotState()); 
+    if(!is_feasible)
+        ROS_WARN("ApproachAndTranslate: state is infeasible!");
+    return is_feasible;
+  }
   else
+  { 
+    ROS_WARN("ApproachAndTranslate: state is in collision!");
     return false;
+  }
 }
 
 bool samplePossibleGoalStates(const ManipulationPlanPtr &plan, const robot_state::RobotState &reference_state, double min_distance, unsigned int attempts)
@@ -228,6 +236,7 @@ bool ApproachAndTranslateStage::evaluate(const ManipulationPlanPtr &plan) const
   {
     for (std::size_t i = attempted_possible_goal_states ; i < plan->possible_goal_states_.size() && !signal_stop_ ; ++i, ++attempted_possible_goal_states)
     {
+      ROS_WARN("ApproachAndTranslate: sampling goal state %d", i); 
       // if we are trying to get as close as possible to the goal (maximum one meter)
       if (plan->shared_data_->minimize_object_distance_)
       {
@@ -252,6 +261,7 @@ bool ApproachAndTranslateStage::evaluate(const ManipulationPlanPtr &plan) const
         computeCartesianPath(approach_states, plan->shared_data_->ik_link_name_,
                              -approach_direction, approach_direction_is_global_frame, plan->approach_.desired_distance,
                              max_step_, jump_factor_, approach_validCallback);
+      ROS_WARN("ApproachAndTranslate: distance approach path %f", d_approach); 
 
       // if we were able to follow the approach direction for sufficient length, try to compute a retreat direction
       if (d_approach > plan->approach_.min_distance && !signal_stop_)
@@ -278,6 +288,7 @@ bool ApproachAndTranslateStage::evaluate(const ManipulationPlanPtr &plan) const
             computeCartesianPath(retreat_states, plan->shared_data_->ik_link_name_,
                                  retreat_direction, retreat_direction_is_global_frame, plan->retreat_.desired_distance,
                                  max_step_, jump_factor_, retreat_validCallback);
+          ROS_WARN("ApproachAndTranslate: distance retreat path %f", d_retreat); 
 
           // if sufficient progress was made in the desired direction, we have a goal state that we can consider for future stages
           if (d_retreat > plan->retreat_.min_distance && !signal_stop_)
@@ -304,6 +315,7 @@ bool ApproachAndTranslateStage::evaluate(const ManipulationPlanPtr &plan) const
             plan->trajectories_.push_back(et_retreat);
 
             plan->approach_state_ = approach_states.front();
+            ROS_WARN("ApproachAndTranslate: successfull!"); 
             return true;
           }
         }
@@ -332,7 +344,7 @@ bool ApproachAndTranslateStage::evaluate(const ManipulationPlanPtr &plan) const
   }
   while (plan->possible_goal_states_.size() < max_goal_count_ && !signal_stop_ && samplePossibleGoalStates(plan, planning_scene_->getCurrentState(), min_distance, max_fail_));
   plan->error_code_.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
-
+  ROS_WARN("ApproachAndTranslate: failed!"); 
   return false;
 }
 
